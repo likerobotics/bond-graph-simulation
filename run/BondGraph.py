@@ -1,36 +1,31 @@
 # -*- coding: utf-8 -*-
 """
 +------------------------------------------------------+
-|                                                      | 
-|                                                      |
-|(c) 2023-2024 @likerobotics                           |
+|(c) 2022-2024 @likerobotics                           |
 |    Islam Bzhikhatlov - ITMO University,              |
 |    Faculty of control systems and Robotics           |
 +------------------------------------------------------+
 
 """
-
 """ 
 A Python Package for robots simulation on low-level
 entities and functionalities based on BondGraph simulation in 1-D space.
-
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
-
 import sympy as sp
 import re
 
+import networkx as nx
 #---------------CORE PART------------------------>>>#
 
 class BGelement( object ):
     id_generator = itertools.count(0) # first generated is 0
     def __init__(self, Type:str, Name = None, Position = [None, None]):
         """
-        initializes a BGcomponent object
-        This is a node in graph structure.
+        BGcomponent is a node in graph structure.
         """
         self.__id = next(self.id_generator)
         self.id = self.__id
@@ -82,7 +77,9 @@ class BGelement( object ):
         if Type == 'TF':
             self.icon = 'TF'
             self.parameter = 'n' + str(self.__id)
-            
+        if Type == 'GY':
+            self.icon = 'GY'
+            self.parameter = 'm' + str(self.__id)
     def __str__(self):
         display =  'BGelement::_____:___________________\n'
         display += '          :   id: %d\n' % self.__id
@@ -317,19 +314,15 @@ class BGbond( object ):
 
 class BondGraph():
     """
-    The main class representing a model of system of subsystem
+    The main class representing a model of system or subsystem
     
     """
     id_generator = itertools.count(0) # first generated is 0
-#     __ID = 0
     __name = None
     debug = False
     def __init__(self, BondsList = [], ElementsList = [], PortsList = [], Name = None):
         """ initializes a Graph object """
         self.__id = next(self.id_generator)
-#         self.__id = BondGraph.__ID
-#         BondGraph.__ID += 1
-#         self.__id += 1
         self.__bondsList = BondsList #connections between node
         self.__elementsList = ElementsList #nodes
         self.__portsList = PortsList # ports
@@ -344,10 +337,10 @@ class BondGraph():
         self.parameter_variables = [] #[C2, R3, I4] ex parameters
         self.capacitor_variables = [] # C2, I4
         self.eff_flows = [] # e1,e,4,f5,f8...
-        self.A = None
-        self.B = None
-        self.C = None
-        self.D = None
+        self.__A = None
+        self.__B = None
+        self.__C = None
+        self.__D = None
 
     def __str__(self):
         display =  'BondGraph::_____:___________________\n'
@@ -356,29 +349,7 @@ class BondGraph():
         display += '                : bondsList: %s\n' % self.__bondsList
         display += '                : portsList: %s\n' % self.__portsList
         display += 'BG:BGelement::__:___________________\n'
-        for element in self.__elementsList:
-            display += '            :   id: %d\n' % element.getId()
-            display += '            : name: %s\n' % element.getName()
-            display += '            : Type: %s\n' % element.getType()
-            display += '            :  pos: %s\n' % element.getPosition()
-            display += '            :  ports: %s\n' % element.getPorts()
-            display += '            :-------------------\n'
-        display += 'BG:BGbond::_____:___________________\n'
-        for element in self.__bondsList:
-            display += '            :   id: %d\n' % element.getId()
-            display += '            : Type: %s\n' % element.getType()
-            display += '            : causalityStroke: %s\n' % element.getCausalityStroke()
-            display += '            : directionArrow: %s\n' % element.getDirectionArrow()
-            display += '            :   To port: %d\n' % element.getFromPort()
-            display += '            : From Port: %s\n' % element.getToPort()
-            display += '            :-------------------\n'
-        display += 'BG:BGConnection(ports)::_____:___________________\n'
-        for element in self.__portsList:
-            display += '          :   id: %d\n' % element.getId()
-            display += '          : Name: %s\n' % element.getName()
-            display += '          : Type: %s\n' % element.getType()
-            display += '            :-------------------\n'
-        return display
+
     
     def reset(self):
         "clean all data in model"
@@ -393,7 +364,7 @@ class BondGraph():
     def check(self):
         pass
      #TODO  Check if any port, or bond or element is not connected
-     # check_free_variables
+     # check if there are sympols that is not variables of system
     
     def addBond(self, Bond):
         """ add edge(connection between Bonds)"""
@@ -436,33 +407,6 @@ class BondGraph():
             adj[element_from].append(element_to)
             adj[element_to].append(element_from)
         return adj
-    
-    def adj_matrix(self):
-        """
-        !!! NOT USED NOW
-        adjacency matrix + type assigning...
-        """
-        s_matrix = np.zeros((len(self.__elementsList), len(self.__elementsList)))
-        # find an ajancency matrix (dont take into account the directions)
-        for bond in self.__bondsList:
-            #take a bond + find the coonected ports
-        #     print('Port numbers:', bond.getFromPort(), bond.getToPort())
-            i = None
-            j = None
-            for item in self.__elementsList:
-                if bond.getFromPort() in item.getPorts():
-                    i = item.getId()
-                    ix = item.getName()
-                elif bond.getToPort() in item.getPorts():
-                    j = item.getId()
-                    jx = item.getName()
-            if i != None and j != None:
-                s_matrix[i, j] = 1
-        #         print(ix,jx, "Connected")
-        titles = [(item.getId(), item.getName()) for item in self.__elementsList]
-        # print(sorted(dict(titles).items()))
-        # print(s_matrix)
-        return s_matrix
     
     def render(self):
         '''
@@ -526,6 +470,9 @@ class BondGraph():
         head = BGport()
         tail = BGport()
 
+        # head.setDirection('Input')
+        # head.setDirection('Output')
+
         first_element.addPort(head)
         second.addPort(tail)
         
@@ -550,9 +497,6 @@ class BondGraph():
         
         """
         
-        import networkx as nx
-        import matplotlib.pyplot as plt
-
         nodes = []
         for node in self.getElementsList():
             nodes.append(node.id)
@@ -654,31 +598,34 @@ class BondGraph():
             if element.getType() == 'SE':
                 if self.debug: print('SE ports=', element.getPorts())
                 for port in element.getPorts():
-                    for bond in self.getBondList():
-                        if bond.getFromPort() == port:
-                            port.setDirection('Output') # asign port power flow type
-                            port.setCausality('Uncausal')
-                        elif bond.getToPort() == port:
-                            if self.debug: print('Source of effort cant have power input, Redefining..')
-                            tempo = bond.getToPort()
-                            bond.setToPort(bond.getFromPort())
-                            bond.setFromPort(tempo)
-                            port.setDirection('Output') # power flow
-                            port.setCausality('Uncausal')
+                    if port.getDirection() == None:
+                        for bond in self.getBondList():
+                            if bond.getFromPort() == port:
+                                port.setDirection('Output') # asign port power flow type
+                                port.setCausality('Uncausal')
+                            elif bond.getToPort() == port:
+                                if self.debug: print('Source of effort cant have power input, Redefining..')
+                                tempo = bond.getToPort()
+                                bond.setToPort(bond.getFromPort())
+                                bond.setFromPort(tempo)
+                                port.setDirection('Output') # power flow
+                                port.setCausality('Uncausal')
+
             if element.getType() == 'SF':
                 if self.debug: print('SF ports=', element.getPorts())
                 for port in element.getPorts():
-                    for bond in self.getBondList():
-                        if bond.getFromPort() == port:
-                            if self.debug: print('Source of flow cant have power output, Redefining..')
-                            tempo = bond.getToPort()
-                            bond.setToPort(bond.getFromPort())
-                            bond.setFromPort(tempo)
-                            port.setDirection('Input') # power flow
-                            port.setCausality('Causal')
-                        elif bond.getToPort() == port:
-                            port.setDirection('Input') # power flow
-                            port.setCausality('Causal')
+                    if port.getDirection() == None:
+                        for bond in self.getBondList():
+                            if bond.getFromPort() == port:
+                                if self.debug: print('Source of flow cant have power output, Redefining..')
+                                tempo = bond.getToPort()
+                                bond.setToPort(bond.getFromPort())
+                                bond.setFromPort(tempo)
+                                port.setDirection('Input') # power flow
+                                port.setCausality('Causal')
+                            elif bond.getToPort() == port:
+                                port.setDirection('Input') # power flow
+                                port.setCausality('Causal')
 
     def assign_ports_for_CRI_elemts(self):
         ## care about C, R and I elements(nodes)
@@ -687,52 +634,151 @@ class BondGraph():
             if element.getType() == 'C':
                 if self.debug: print('C ports=', element.getPorts())
                 for port in element.getPorts():
-                    for bond in self.getBondList():
-                        if bond.getFromPort() == port:
-                            if self.debug: print('Capacitor cant have power input, Redefining..')
-                            tempo = bond.getToPort()
-                            bond.setToPort(bond.getFromPort())
-                            bond.setFromPort(tempo)
-                            port.setDirection('Input')
-                            port.setCausality('Uncausal') # Rule
-                        elif bond.getToPort() == port:
-                            port.setDirection('Input')
-                            port.setCausality('Uncausal') # Rule
+                    if port.getDirection() == None:
+                        for bond in self.getBondList():
+                            if bond.getFromPort() == port:
+                                if self.debug: print('Capacitor cant have power input, Redefining..')
+                                tempo = bond.getToPort()
+                                bond.setToPort(bond.getFromPort())
+                                bond.setFromPort(tempo)
+                                port.setDirection('Input')
+                                port.setCausality('Uncausal') # Rule
+                            elif bond.getToPort() == port:
+                                port.setDirection('Input')
+                                port.setCausality('Uncausal') # Rule
             if element.getType() == 'R':
                 if self.debug: print('R ports=', element.getPorts())
                 # R-RULE: power go IN anyway(dissipative element), CAUSALITY Effort only GO OUT (to be linear form)
                 for port in element.getPorts():
-                    for bond in self.getBondList():
-                        if bond.getFromPort() == port:
-                            if self.debug: print('Dissipative elemnt cant have power flow out, Redefining..')
-                            tempo = bond.getToPort()
-                            bond.setToPort(bond.getFromPort())
-                            bond.setFromPort(tempo)
-                            port.setDirection('Input')
-                            port.setCausality('Uncausal') # Rule
-                        elif bond.getToPort() == port:
-                            port.setDirection('Input')
-                            port.setCausality('Uncausal') # Rule
+                    if port.getDirection() == None:
+                        for bond in self.getBondList():
+                            if bond.getFromPort() == port:
+                                if self.debug: print('Dissipative elemnt cant have power flow out, Redefining..')
+                                tempo = bond.getToPort()
+                                bond.setToPort(bond.getFromPort())
+                                bond.setFromPort(tempo)
+                                port.setDirection('Input')
+                                port.setCausality('Uncausal') # Rule
+                            elif bond.getToPort() == port:
+                                port.setDirection('Input')
+                                port.setCausality('Uncausal') # Rule
             # I-RULE: power go in or out(reversable energy storage), CAUSALITY Effort only GO IN(integral form)
             if element.getType() == 'I':
                 if self.debug: print('I ports=', element.getPorts())
                 for port in element.getPorts():
-                    for bond in self.getBondList():
-                        if bond.getFromPort() == port:
-                            if self.debug: print('I-element cant have power go out in linear form')
-                            tempo = bond.getToPort()
-                            bond.setToPort(bond.getFromPort())
-                            bond.setFromPort(tempo)
-                            port.setDirection('Input')
-                            port.setCausality('Causal')
-                        elif bond.getToPort() == port:
-                            port.setDirection('Input')
-                            port.setCausality('Causal')
+                    if port.getDirection() == None:
+                        for bond in self.getBondList():
+                            if bond.getFromPort() == port:
+                                if self.debug: print('I-element cant have power go out in linear form')
+                                tempo = bond.getToPort()
+                                bond.setToPort(bond.getFromPort())
+                                bond.setFromPort(tempo)
+                                port.setDirection('Input')
+                                port.setCausality('Causal')
+                            elif bond.getToPort() == port:
+                                port.setDirection('Input')
+                                port.setCausality('Causal')
     
-    def applyTF_GY_rules(self):
-        # TF-RULE: (only 2 ports must be connected) - power go in from one side and out on another side (power conservative element), 
+    def assign_ports_TF_GY(self):
+        # RULE: (only 2 ports must be connected) - power go in from one side and out on another side (power conservative element), 
         # CAUSALITY only for one port, causality can be reversed during auto asignment
+        
         list_of_tf = [element for element in self.getElementsList() if element.getType() == 'TF']
+        for element in list_of_tf:
+            if self.debug: print('TF ports=', element.getPorts())
+            #if one port is assigned port has no direction or causality
+            for port in element.getPorts():
+                connected_bonds = [bond for bond in self.getBondList() if bond.getToPort() == port or bond.getFromPort() == port]
+                if port.getDirection() == None:
+                    if self.debug: print('TF-element can have 1 input and 1 output only')
+                    if connected_bonds[0].getToPort() == port:
+                        # from TF to element
+                        tempo = connected_bonds[0].getToPort()
+                        connected_bonds[0].setToPort(connected_bonds[0].getFromPort())
+                        connected_bonds[0].setFromPort(tempo)
+                        port.setDirection('Input')
+                        # if one input,  another is output also
+                        for port2 in element.getPorts():
+                            if port2 != port: port2.setDirection('Output')
+                    elif connected_bonds[0].getFromPort() == port:
+                        # from element to TF
+                        port.setDirection('Output')
+                        for port2 in element.getPorts():
+                            if port2 != port: port2.setDirection('Input')
+                elif port.getCausality() == None:
+                    print('TF has NOne causality')
+                    if connected_bonds[0].getToPort() == port:
+                        #assing based on other side of bonds port causality
+                        if connected_bonds[0].getToPort().getCausality() == 'Causal':
+                            port.setCausality('Uncausal')
+                            for port2 in element.getPorts():
+                                if port2 != port: port2.setCausality('Causal')
+                        elif connected_bonds[0].getFromPort().getCausality() == 'Uncausal':
+                            port.setCausality('Causal')
+                            for port2 in element.getPorts():
+                                if port2 != port: port2.setCausality('Uncausal')
+                        # assigning based on rule of TF, if one port is causal, another mast be uncausal and vice versa
+                        alter_ports = [an_port for an_port in element.getPorts() if an_port != port and an_port.getCausality() != None]
+                        if len(alter_ports) > 0:
+                            if alter_ports[0].getCausality() == 'Causal':
+                                port.setCausality('Uncausal')
+                            elif alter_ports[0].getCausality() == 'Uncausal':
+                                port.setCausality('Causal')
+                            else:
+                                print('Errror in conditions')
+                else:
+                    pass
+                    # print('no info for assigning, skipping for TF')
+
+        list_of_gy = [element for element in self.getElementsList() if element.getType() == 'GY']
+        for element in list_of_gy:
+            if self.debug: print('GY ports=', element.getPorts())
+            #if one port is assigned port has no direction or causality
+            for port in element.getPorts():
+                connected_bonds = [bond for bond in self.getBondList() if bond.getToPort() == port or bond.getFromPort() == port]
+                if port.getDirection() == None:                    
+                    if self.debug: print('GY-element can have 1 input and 1 output only')
+                    if connected_bonds[0].getToPort() == port:
+                        # from GY to element
+                        tempo = connected_bonds[0].getToPort()
+                        connected_bonds[0].setToPort(connected_bonds[0].getFromPort())
+                        connected_bonds[0].setFromPort(tempo)
+                        port.setDirection('Input')
+                        for port2 in element.getPorts():
+                            if port2 != port: port2.setDirection('Output')
+                    elif connected_bonds[0].getFromPort() == port:
+                        # from element to GY
+                        port.setDirection('Output')
+                        for port2 in element.getPorts():
+                            if port2 != port: port2.setDirection('Input')
+                elif port.getCausality() == None:
+                    if connected_bonds[0].getToPort() == port:
+                        if connected_bonds[0].getFromPort().getCausality() == 'Causal':
+                            port.setCausality('Uncausal')
+                            for port2 in element.getPorts():
+                                if port2 != port: port2.setCausality('Causal')
+                        elif connected_bonds[0].getFromPort().getCausality() == 'Uncausal':
+                            port.setCausality('Causal')
+                            for port2 in element.getPorts():
+                                if port2 != port: port2.setCausality('Uncausal')
+                        # assigning based on rule of GY, if one port is causal, another must be causal also and vice versa (both uncausal)
+                        alter_ports = [an_port for an_port in element.getPorts() if an_port != port and an_port.getCausality() != None]
+                        if len(alter_ports) > 0:
+                            if alter_ports[0].getCausality() == 'Causal':
+                                port.setCausality('Causal')
+                            elif alter_ports[0].getCausality() == 'Uncausal':
+                                port.setCausality('Uncausal')
+                            else:
+                                print('Errror in conditions')
+                else:
+                    pass
+                    # print('no info for assigning, skipping for GY')
+
+    def applyTF_GY_rules(self):
+        # NOT USED
+        # GY-RULE: (only 2 ports must be connected) - power go in from one side and out on another side (power conservative element), 
+        # CAUSALITY only for one port, causality can be reversed during auto asignment
+        list_of_tf = [element for element in self.getElementsList() if element.getType() == 'GY']
         # IF WE HAVE 
         for item in list_of_tf:
             item_ports = item.getPorts()
@@ -751,8 +797,6 @@ class BondGraph():
             else:
 #                 print(f'WARNING! UNdefined direction {item_ports}')
                 pass
-        #TODO GY 
-
     def update_bondsport_status(self):
         '''
         If one port assigned, the opposite one can be assigned because of common bond
@@ -766,22 +810,22 @@ class BondGraph():
         for pair in port_pairs:
             if pair[0].getDirection() == 'Input':
                 pair[1].setDirection('Output')
-            elif pair[0].getDirection() == 'Output':
+            if pair[0].getDirection() == 'Output':
                 pair[1].setDirection('Input')
-            elif pair[1].getDirection() == 'Input':
+            if pair[1].getDirection() == 'Input':
                 pair[0].setDirection('Output')
-            elif pair[1].getDirection() == 'Output':
+            if pair[1].getDirection() == 'Output':
                 pair[0].setDirection('Input')
            
         # update the causal-uncausal values
         for pair in port_pairs:
             if pair[0].getCausality() == 'Causal':
                 pair[1].setCausality('Uncausal')
-            elif pair[0].getCausality() == 'Uncausal':
+            if pair[0].getCausality() == 'Uncausal':
                 pair[1].setCausality('Causal')
-            elif pair[1].getCausality() == 'Causal':
+            if pair[1].getCausality() == 'Causal':
                 pair[0].setCausality('Uncausal')
-            elif pair[1].getCausality() == 'Uncausal':
+            if pair[1].getCausality() == 'Uncausal':
                 pair[0].setCausality('Causal')
 
     def apply_one_zero_junction_rule(self):
@@ -842,6 +886,7 @@ class BondGraph():
                         port.setDirection('Output')
             else:
                 if self.debug: print('passing')
+
             if output_counter == len(item_ports)-1:
                 if self.debug: print('Assign input')
                 for port in item_ports:
@@ -870,15 +915,8 @@ class BondGraph():
         for item in list_of_ones:
             item_ports = item.getPorts()
             state_equation = []
-            causal_counter = 0
-            uncausal_counter = 0
-            for port in item_ports:
-                if port.getCausality() == 'Causal':
-                    causal_counter += 1
-                elif port.getCausality() == 'Uncausal':
-                    uncausal_counter += 1
-                else:
-                    if self.debug: print('Causality is not detectable yet')
+            causal_counter = len([port for port in item_ports if port.getCausality() == 'Causal'])
+            uncausal_counter = len([port for port in item_ports if port.getCausality() == 'Uncausal'])
             # if N-1 ports causal, the one last is uncausal
             if causal_counter == len(item_ports)-1:
                 if self.debug: print('Assign Uncausal')
@@ -900,15 +938,10 @@ class BondGraph():
         for item in list_of_zeros:
             item_ports =item.getPorts()
             state_equation = []
-            causal_counter = 0
-            uncausal_counter = 0
-            for port in item_ports:
-                if port.getCausality() == 'Causal':
-                    causal_counter+=1
-                elif port.getCausality() == 'Uncausal':
-                    uncausal_counter+=1
-                else:
-                    if self.debug: print('Causality is not detectable yet')
+            causal_counter = len([port for port in item_ports if port.getCausality() == 'Causal'])
+            uncausal_counter = len([port for port in item_ports if port.getCausality() == 'Uncausal'])
+            if self.debug and causal_counter == 0: print('Causality is not detectable yet')
+            
             # If one port is Causal, then all others Uncausal
             if causal_counter == 1:
                 if self.debug: print('Assign uncausal')
@@ -917,6 +950,7 @@ class BondGraph():
                         port.setCausality('Uncausal')
             else:
                 if self.debug: print('passing')
+            
             # if n-1 PORTS ARE UNCAUSAL, THAN LAST ONE IS CAUSAL
             if uncausal_counter == len(item_ports)-1:
                 if self.debug: print('Assign causal')
@@ -928,7 +962,7 @@ class BondGraph():
     
     def verifyRules(self):
         """
-        After applyRules comletion use it to check all rules.
+        Originnalu this methos used After applyRules to check for algebraic loops and any other problems.
         self.__elementsList --> model.getElementsList()
         self.__bondsList --> model.getBondList()
         """
@@ -951,24 +985,21 @@ class BondGraph():
     
     def applyRules(self):
         """
-        Hust dirty assign for first time.
+        
         Iteratively applied the rules to assign BG ports (not bonds) using known data.
         Algebraec loops is not avoided and can lead to errors (be carefull!!!).
         """
         i = 0
-        while None in self.display_PortsStatus():
-#             print('next iteration', i)
+        while None in self.display_PortsStatus() or None in self.display_Causality():
+            # print('next iteration', i)
             i += 1
             self.assign_sources_ports()
             self.update_bondsport_status()
             self.assign_ports_for_CRI_elemts()
-            self.update_bondsport_status()
+            self.assign_ports_TF_GY()
             self.apply_one_zero_junction_rule()
-            self.update_bondsport_status()
-            self.applyTF_GY_rules()
-            self.update_bondsport_status()
             if i > 100:
-                print('ERROR 001: FAIL! Max iterations reached, while applyRules')
+                print('ERROR 001: FAILED! Max iterations reached, while applyRules,  probably there are some algebraic loops')
                 break
         
     ##### Automatically get the state-space eq #############################################
@@ -1020,7 +1051,8 @@ class BondGraph():
 
     def assign_0_1_junctions_effort_flow(self):
         '''
-        for 0-1 junctions assign all bonds an input or output effort-flows (determine equations 1 step)
+        Note! All ports direction and causality must be defined before this step.
+        For 0-1 junctions assign all bonds an input or output effort-flows (determine equations 1 step)
         Note: on this step we don't have all required information and some elements e/f will be undefined
         '''
         for element in self.getElementsList():
@@ -1083,7 +1115,7 @@ class BondGraph():
         """
         Just asign the ports according bond signs
         """
-        #TODO Зачем? разве дальше используются порты? бонды уже используются вроде..
+        #depricated
         if self.debug: print("assign_ports_according_parent")
         for element in self.getElementsList():
             for port in self.getPortsList():
@@ -1091,26 +1123,6 @@ class BondGraph():
                     port.effort = element.getEffort()
                     port.flow = element.getFlow()
 
-    # START DISPLAY FUNCTIONS 
-    def show_bonds_effort_flow(self):
-        '''
-        Display effort-flow of bonds
-        '''
-        if self.debug: print('Effort-flow of each bond\n')
-        for bond in self.getBondList():
-            print(bond.effort, bond.flow)
-    
-    def show_ports_state(self):
-        '''
-        Display elements and ports data: input or output and Causality
-        print like a tree
-        '''
-        for element in self.getElementsList():
-            print('Element name: ', element.getName())
-            for port in element.getPorts():
-                print('++ port_id:', port.getId(), '|  arrow: ', port.getDirection(), '|  causality: ', port.getCausality())
-    
-    ### END DISPLAY FUNCTIONS
     def get_model_equations(self):
         '''
         Returns all equations for each effort and flows
@@ -1142,11 +1154,11 @@ class BondGraph():
                 elif port == bond.getToPort():
                     connected_ports[1] = port
         #     print(connected_ports[0], connected_ports[1], '--------------------------------------->>>>')
-            # print(".....for elements C, I, R, SE, SF") 
+            print(".....for elements C, I, R, SE, SF") 
             for element in self.getElementsList():
                 for element2 in self.getElementsList():
                     if connected_ports[0] in element.getPorts() and connected_ports[1] in element2.getPorts():
-                        print('both elements found...', element.getId(), element2.getId(), element.getType(), element2.getType(), '-----------------------')
+                        print('both elements found...id-s:', element.getId(), element2.getId(), ', type: ',element.getType(), element2.getType(), '-----------------------')
 
                         if element.getType() == '1' and element2.getType() == 'C':
                             #print('from C to 1 detected', connected_ports[0].getDirection(), connected_ports[1].getDirection())
@@ -1194,18 +1206,16 @@ class BondGraph():
                                 print('Fr 1 to TF Bond =', bond.getId(), 'el1 eff=', element.getEffort(), 'el1 flow=', element.getFlow(), 'EL2 eff=', element2.getEffort(), 'el2 flow=', element2.getFlow())
                                 #+'=' + element2.getParam() + element2.getEffort()
                                 bond.flow = element.getFlow() # obtaining from left side (not TF side)
-                                # RULE: Если у TF еще не известны effort and flows then partially fill it
+                                # RULE: the TF's effort is known and flow is not known then partially fill flow
                                 if element2.getFlow() == None:
                                     element2.setFlow('+f' + str(bond.getId()) + '*1/' + element2.getParam()) # prepare for other side bond
-                                    print('TF prepare flow', element2.getFlow())
-                                
+                                    print('TFs flow prepared: ', element2.getFlow())
                                 if element2.getEffort() != None:
-                                    # if this is prepeared already when handled other side bond
+                                    # if this is prepeared already when we compleate anouther side of bond
                                     bond.effort = '+e' + str(bond.getId()) + '=' + element2.getEffort()
-                                
                                 print('-++TF effort=',  bond.effort, 'flow=', bond.flow)
                             else:
-                                print('passing Why??, need flip Inp Out ???')
+                                print('ERROR: detected FROM and To mismatching the Output and Input, troubles with assigning ports')
                         
                         if element.getType() == 'TF' and element2.getType() == '1':
                             print('from TF to 1 detected', connected_ports[0].getDirection(), connected_ports[1].getDirection())
@@ -1216,7 +1226,6 @@ class BondGraph():
                                 if element.getFlow() != None:
                                     # if this is prepeared already then handled other side bond
                                     bond.flow = '+f' + str(bond.getId()) + '=' + element.getFlow() # use prepeared Flow from other side
-                    
                                 if element.getEffort() == None:
                                     # RULE: if the TF's effort still is unknown /// then partially fill it (prepare)
                                     element.setEffort('+e' + str(bond.getId()) + '*' + element.getParam()) # prepare effors part for other side bond
@@ -1225,24 +1234,50 @@ class BondGraph():
                                 print('-+-TF effort=',  bond.effort, 'flow=', bond.flow)
                                 print('BOND ID=', bond.getId())
                             else:
-                                print('passing Why??')
-                          # REPEATING BECAUSE NO IDEA WHAT FIRST
-#                         if element.getType() == '1' and element2.getType() == 'TF':
-#                             print('from 1 to TF detected', connected_ports[0].getDirection(), connected_ports[1].getDirection())
+                                print('ERROR: detected FROM and To mismatching the Output and Input, troubles with assigning ports')
+                        
+                        if element.getType() == '1' and element2.getType() == 'GY':
+                            print('from 1 to GY detected', connected_ports[0].getDirection(), connected_ports[1].getDirection())
 #                             print('causality:', connected_ports[0].getCausality(), connected_ports[1].getCausality())
-#                             if connected_ports[0].getDirection() == 'Output' and connected_ports[1].getDirection() == 'Input':
-#                                 print('From 1 to TF connection.... Bond iD=', bond.getId(), 'elemnts efforts=', element.getEffort(), 'elemnts flow=', element.getFlow(), 'EL 2=', 'elemnts efforts=', element2.getEffort(), 'elemnts flow=', element2.getFlow())
-#                                 #+'=' + element2.getParam() + element2.getEffort()
-#                                 bond.flow = element.getFlow() # obtaining from left side (not TF side)
-#                                 if element2.getFlow() == None:
-#                                     element2.setFlow('+f' + str(bond.getId()) + '*1/' + element2.getParam()) # prepare for other side bond
-#                                 if element2.getEffort() != None:
-#                                     bond.effort = '+e' + str(bond.getId()) + '=' + element2.getEffort()
-#                                 if self.debug: print('-++TF', 'effort=',  bond.effort, 'flow=', bond.flow)
-#                             else:
-#                                 print('passing Why??, need flip Inp Out ???')
+                            if connected_ports[0].getDirection() == 'Output' and connected_ports[1].getDirection() == 'Input':
+                                print('Fr 1 to GY Bond =', bond.getId(), 'el1 eff=', element.getEffort(), 'el1 flow=', element.getFlow(), 'EL2 eff=', element2.getEffort(), 'el2 flow=', element2.getFlow())
+                                #+'=' + element2.getParam() + element2.getEffort()
+                                bond.flow = element.getFlow() # RULE: 1-junction has common flow (comes not from TF side), hense fill it
+                                if element2.getFlow() == None:
+                                    element2.setFlow('+f' + str(bond.getId()) + '*' + element2.getParam()) # prepare for other side of GY (=f*m)
+                                    print('GY prepared flow', element2.getFlow())
+                                if element2.getEffort() != None:
+                                    # if this is prepeared already when we compleate anouther side of bond
+                                    bond.effort = '+e' + str(bond.getId()) + '=' + element2.getEffort()
+                                print('-++GY effort=',  bond.effort, 'flow=', bond.flow)
+                            else:
+                                print('ERROR: detected FROM and To mismatching the Output and Input, troubles with assigning ports')
+
+                        if element.getType() == 'GY' and element2.getType() == '1':
+                            print('from GY to 1 detected', connected_ports[0].getDirection(), connected_ports[1].getDirection())
+                            if connected_ports[0].getDirection() == 'Output' and connected_ports[1].getDirection() == 'Input':
+                                print('Fr GY to 1 conn... Bond iD=', bond.getId(), 'elem1 eff=', element.getEffort(), 'el1 flow=', element.getFlow(), 'elem2 eff=', element2.getEffort(), 'elem2 fl=', element2.getFlow())
+#                                 bond.effort = self.express_new(element2.getEffort(), '+e' + str(bond.getId()))
+                                bond.flow = element2.getFlow() 
+                                if element.getFlow() == None:
+                                    # if this is prepeared already then handled other side bond
+                                    bond.flow = '+f' + str(bond.getId()) + '=' + element2.getFlow() # use prepeared Flow from other side
+                                if element.getEffort() == None:
+                                    # RULE: if the GY's effort still is unknown // then partially fill it (prepare)
+                                    element.setEffort('+f' + str(bond.getId()) + '*' + element.getParam()) # prepare effors part for other side bond
+                                    # print('GY prepare effort', element.getEffort(), element.getEffort())
+                                    # bond.effort = '+e' + str(bond.getId()) + '=' + element.getEffort()
+                                else:
+                                    # already prepared GY effor value
+                                    bond.effort = '+e' + str(bond.getId()) + '=' + element.getFlow()
+
+                                print('-+-GY effort=',  bond.effort, 'flow=', bond.flow)
+                                print('BOND ID=', bond.getId())
+                            else:
+                                print('ERROR: detected FROM and To mismatching the Output and Input, troubles with assigning ports')
+                        
             # same for 1-0 junctions
-            # print(".....for elements C, I, R, SE, SF") 
+            # print(".....for elements 1, 0") 
             for element in self.getElementsList():
                 for element2 in self.getElementsList():
                     if connected_ports[0] in element.getPorts() and connected_ports[1] in element2.getPorts():
@@ -1276,7 +1311,6 @@ class BondGraph():
         
         self.assign_0_1_junctions_effort_flow()
         self.assign_ports_according_parent()
-        self.assign_bonds()
         self.assign_bonds() # TODO make it iterativly in future 
         
     @staticmethod
@@ -1553,14 +1587,17 @@ class BondGraph():
                 ans = True
         return ans
     
-    def cauchy_form_output_eq(self, variables_exp):
+    def cauchy_form_output_eq(self, variables_exp, output_variables):
         '''
         Returns the equations describing the output of the model, to be used later for C, D matrix
         NB! Requred to enter the variables name of system output.
+
+        output_variables = "e7,f7"
         '''
         print('Input the names of output variables:')
         print('It mast be in list eff_flows: ', self.eff_flows_sp, '(Velocity of Force at some point)')
-        output_variables = input().split(',')
+        #output_variables = input().split(',') # uncomment to take variables from input field
+        output_variables = output_variables.split(',')
         print('U entered this: ', output_variables)
         output_variables_simpy = [sp.symbols(v) for v  in output_variables]
 
@@ -1674,17 +1711,15 @@ class BondGraph():
         # for input
         B_matrix = self.make_matrix_from_cauchy(B_matrix, cauchy_state_equastions, self.input_variables)
         # print(A_matrix, B_matrix)
-        self.A = A_matrix
-        self.B = B_matrix
+        self.__A = A_matrix
+        self.__B = B_matrix
     
     def make_output_statespace(self, cauchy_form_output_eq):
         '''
         Makes a symbolic C and D matrix in state-space form
         Inputs:
         cauchy_form_output_eq - output equastions
-
         '''
-
         m_size = len(self.state_variables)
         n_size = len(self.input_variables)
 
@@ -1706,8 +1741,8 @@ class BondGraph():
         D_matrix = self.make_matrix_from_cauchy(D_matrix, cauchy_form_output_eq, self.input_variables)
         # print(C_matrix, D_matrix)
         
-        self.C = C_matrix
-        self.D = D_matrix
+        self.__C = C_matrix
+        self.__D = D_matrix
     
     def cauchy_form_equastions_sequence(self):
         ''' 
@@ -1768,19 +1803,17 @@ class BondGraph():
         '''
         parameters_list = self.parameter_variables 
         # make numerical materix frim symbolic
-        A = np.array(self.A.subs({parameters_list[i]:parameters_values[i] for i in range(len(parameters_list))})).astype(np.float64)
-        B = np.array(self.B.subs({parameters_list[i]:parameters_values[i] for i in range(len(parameters_list))})).astype(np.float64)
-        C = np.array(self.C.subs({parameters_list[i]:parameters_values[i] for i in range(len(parameters_list))})).astype(np.float64)
-        D = np.array(self.D.subs({parameters_list[i]:parameters_values[i] for i in range(len(parameters_list))})).astype(np.float64)
+        A = np.array(self.__A.subs({parameters_list[i]:parameters_values[i] for i in range(len(parameters_list))})).astype(np.float64)
+        B = np.array(self.__B.subs({parameters_list[i]:parameters_values[i] for i in range(len(parameters_list))})).astype(np.float64)
+        C = np.array(self.__C.subs({parameters_list[i]:parameters_values[i] for i in range(len(parameters_list))})).astype(np.float64)
+        D = np.array(self.__D.subs({parameters_list[i]:parameters_values[i] for i in range(len(parameters_list))})).astype(np.float64)
         
         I = np.identity(A.shape[0]) # this is an identity matrix
         Ad = np.linalg.inv(I - sampling_period * A)
         Bd = Ad.dot(sampling_period * B)
-    #     print("Bd.shape", Bd.shape)
         Xd = np.zeros(shape=(A.shape[0], time_steps + 1))
         Yd = np.zeros(shape=(C.shape[0], time_steps + 1))
         for i in range(0, time_steps):
-    #         print('i=', i)
             if i == 0:
                 Xd[:,[i]] = initial_state
     #             print((C@initial_state.reshape(len(state_variables), 1)).shape)
@@ -1789,17 +1822,37 @@ class BondGraph():
                 x = Ad@initial_state + Bd@input_sequence[i].reshape(len(self.input_variables),1)
     #             print(x.shape)
             else:
-
                 Xd[:,[i]] = x
                 Yd[:,[i]] = C@x + D@input_sequence[i].reshape(len(self.input_variables),1)
                 x = Ad@x + Bd@input_sequence[i].reshape(len(self.input_variables), 1)
         Xd[:,[-1]] = x
         Yd[:,[-1]]  = C@x + D@input_sequence[i].reshape(len(self.input_variables),1)
-        #TODO Using D matrix correctness to be verified later
+        #TODO correctness of D matrix Using should be verified later
         return Xd, Yd
 
+# START DISPLAY FUNCTIONS 
+def show_bonds_effort_flow(model:BondGraph):
+    '''
+    Display effort-flow of bonds
+    '''
+    for bond in model.getBondList():
+        print(f'Bond id {bond.getId()}, effort={bond.effort}, flow={bond.flow}')
 
-    
+def show_ports_state(model:BondGraph):
+    '''
+    Display elements and ports data: input or output and Causality
+    print like a tree
+    '''
+    for element in model.getElementsList():
+        print('Element name: ', element.getName())
+        for port in element.getPorts():
+            print('++ port_id:', port.getId(), '|  arrow: ', port.getDirection(), '|  causality: ', port.getCausality())
+
+### END DISPLAY FUNCTIONS
+
+
+
+
 #------------------- for next work - additional classes for generalization
 # from Extras.enum import Enum
 

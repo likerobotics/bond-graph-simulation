@@ -89,6 +89,7 @@ Model *(BondGraph) architecture:
 008: 
 
 ### TODO list
+Add example of inverted pendulum on card
 Add GY elements
 GUI to draw the bondgraph (without coding)
 API for easy interaction with model

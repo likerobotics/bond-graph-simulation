@@ -38,4 +38,5 @@ def BondGpraph_from_model(G: nx.Graph )-> bg.BondGraph:
         if i not in connections_list:
             model.connect(items_pursed[i[0]], items_pursed[i[1]])
             connections_list.append(i)
+            
     return model
