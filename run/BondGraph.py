@@ -350,6 +350,21 @@ class BondGraph():
         display += '                : portsList: %s\n' % self.__portsList
         display += 'BG:BGelement::__:___________________\n'
 
+    def get_matrix_A(self):
+        """ Return A matrix """
+        return self.__A
+    
+    def get_matrix_B(self):
+        """ Return B matrix """
+        return self.__B
+    
+    def get_matrix_C(self):
+        """ Return C matrix """
+        return self.__A
+    
+    def get_matrix_D(self):
+        """ Return D matrix """
+        return self.__B
     
     def reset(self):
         "clean all data in model"
@@ -363,6 +378,8 @@ class BondGraph():
     
     def check(self):
         pass
+
+
      #TODO  Check if any port, or bond or element is not connected
      # check if there are sympols that is not variables of system
     
@@ -557,10 +574,10 @@ class BondGraph():
         
         #lets draw
         plt.figure(figsize=(19,8))
-        nx.draw_networkx_nodes(G, pos, nodelist=nodes, node_color="tab:red", node_size = 300)
-        nx.draw_networkx_edges(G, pos, edgelist=real_edges, edge_color='b', arrows=True, connectionstyle='arc3, rad = 0.2')
-        nx.draw_networkx_edges(G, pos, edgelist=unreal_edges, edge_color='g', arrows=True, connectionstyle='angle3, angleA=90, angleB=0', arrowstyle=']-, widthA=1.5, lengthA=0.2', min_source_margin=10, min_target_margin=10)
-        nx.draw_networkx_labels(G, pos, labels, font_size=12, font_color="whitesmoke")
+        nx.draw_networkx_nodes(G, pos, nodelist=nodes, node_color="tab:red", node_size = 700)
+        nx.draw_networkx_edges(G, pos, edgelist=real_edges, edge_color='b', arrowsize=16, arrows=True, connectionstyle='arc3, rad = 0.2')
+        nx.draw_networkx_edges(G, pos, edgelist=unreal_edges, edge_color='g', arrows=True, connectionstyle='angle3, angleA=90, angleB=0', arrowstyle=']-, widthA=1.5, lengthA=0.2', min_source_margin=20, min_target_margin=20)
+        nx.draw_networkx_labels(G, pos, labels, font_size=15, font_color="whitesmoke", font_weight="bold")
         nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)        
         plt.margins(0.2)
         
@@ -962,7 +979,8 @@ class BondGraph():
     
     def verifyRules(self):
         """
-        Originnalu this methos used After applyRules to check for algebraic loops and any other problems.
+        Originally this method used after "applyRules" methos for model completeness check!
+        (or algebraic loops and any other problems).
         self.__elementsList --> model.getElementsList()
         self.__bondsList --> model.getBondList()
         """
@@ -999,7 +1017,7 @@ class BondGraph():
             self.assign_ports_TF_GY()
             self.apply_one_zero_junction_rule()
             if i > 100:
-                print('ERROR 001: FAILED! Max iterations reached, while applyRules,  probably there are some algebraic loops')
+                print('ERROR 001: FAILED! Max iterations reached, while applyRules, probably there are some algebraic loops')
                 break
         
     ##### Automatically get the state-space eq #############################################
@@ -1027,7 +1045,7 @@ class BondGraph():
         # if requested var is not found 
         pos = equation.find(var)
         if pos == -1:
-            print('Express: not found the variable, inverse variable check')
+            # print('Express: not found the variable, inverse variable check')
             pos_inv = equation.find(var_inv)
             if pos_inv == -1:
                 print('ERROR 002: NOT FOUND the variable in initial and inverse equation')
@@ -1127,7 +1145,7 @@ class BondGraph():
         '''
         Returns all equations for each effort and flows
         
-        equastions - list of string elements
+        equations - list of string elements
         '''
         equations = []
         for bond in self.getBondList():
@@ -1145,7 +1163,7 @@ class BondGraph():
         assign effort-flow equations for all bonds, firstly for bonds connecting to C, I, R, SE, SF, secondly for 1-0 and 0-1 bonds
 
         '''
-        print("assign_bonds...")
+        if self.debug: print("assign_bonds...")
         for bond in self.getBondList():
             connected_ports = {}
             for port in self.getPortsList():
@@ -1154,11 +1172,11 @@ class BondGraph():
                 elif port == bond.getToPort():
                     connected_ports[1] = port
         #     print(connected_ports[0], connected_ports[1], '--------------------------------------->>>>')
-            print(".....for elements C, I, R, SE, SF") 
+            if self.debug: print(".....for elements C, I, R, SE, SF") 
             for element in self.getElementsList():
                 for element2 in self.getElementsList():
                     if connected_ports[0] in element.getPorts() and connected_ports[1] in element2.getPorts():
-                        print('both elements found...id-s:', element.getId(), element2.getId(), ', type: ',element.getType(), element2.getType(), '-----------------------')
+                        if self.debug: print('both elements found...id-s:', element.getId(), element2.getId(), ', type: ',element.getType(), element2.getType(), '-----------------------')
 
                         if element.getType() == '1' and element2.getType() == 'C':
                             #print('from C to 1 detected', connected_ports[0].getDirection(), connected_ports[1].getDirection())
@@ -1213,7 +1231,7 @@ class BondGraph():
                                 if element2.getEffort() != None:
                                     # if this is prepeared already when we compleate anouther side of bond
                                     bond.effort = '+e' + str(bond.getId()) + '=' + element2.getEffort()
-                                print('-++TF effort=',  bond.effort, 'flow=', bond.flow)
+                                if self.debug: print('-++TF effort=',  bond.effort, 'flow=', bond.flow)
                             else:
                                 print('ERROR: detected FROM and To mismatching the Output and Input, troubles with assigning ports')
                         
@@ -1231,13 +1249,13 @@ class BondGraph():
                                     element.setEffort('+e' + str(bond.getId()) + '*' + element.getParam()) # prepare effors part for other side bond
                                     print('TF prepare effort', element.getEffort())
                                     
-                                print('-+-TF effort=',  bond.effort, 'flow=', bond.flow)
-                                print('BOND ID=', bond.getId())
+                                if self.debug: print('-+-TF effort=',  bond.effort, 'flow=', bond.flow)
+                                if self.debug: print('BOND ID=', bond.getId())
                             else:
                                 print('ERROR: detected FROM and To mismatching the Output and Input, troubles with assigning ports')
                         
                         if element.getType() == '1' and element2.getType() == 'GY':
-                            print('from 1 to GY detected', connected_ports[0].getDirection(), connected_ports[1].getDirection())
+                            if self.debug: print('from 1 to GY detected', connected_ports[0].getDirection(), connected_ports[1].getDirection())
 #                             print('causality:', connected_ports[0].getCausality(), connected_ports[1].getCausality())
                             if connected_ports[0].getDirection() == 'Output' and connected_ports[1].getDirection() == 'Input':
                                 print('Fr 1 to GY Bond =', bond.getId(), 'el1 eff=', element.getEffort(), 'el1 flow=', element.getFlow(), 'EL2 eff=', element2.getEffort(), 'el2 flow=', element2.getFlow())
@@ -1249,7 +1267,7 @@ class BondGraph():
                                 if element2.getEffort() != None:
                                     # if this is prepeared already when we compleate anouther side of bond
                                     bond.effort = '+e' + str(bond.getId()) + '=' + element2.getEffort()
-                                print('-++GY effort=',  bond.effort, 'flow=', bond.flow)
+                                if self.debug: print('-++GY effort=',  bond.effort, 'flow=', bond.flow)
                             else:
                                 print('ERROR: detected FROM and To mismatching the Output and Input, troubles with assigning ports')
 
@@ -1306,12 +1324,22 @@ class BondGraph():
     def assign_equations(self):
 
         '''
+        
+        NB! Before equations derivation you have to assing all ports and bonds in the model!!!
         Pipeline: Assign system equations (effort-flow for each bond) 
         '''
-        
-        self.assign_0_1_junctions_effort_flow()
-        self.assign_ports_according_parent()
-        self.assign_bonds() # TODO make it iterativly in future 
+        not_compleated = True
+        i = 0
+        while not_compleated and i < 10:    
+            self.assign_0_1_junctions_effort_flow()
+            self.assign_ports_according_parent()
+            self.assign_bonds() 
+            i+=1
+            if '' not in self.get_model_equations():
+                not_compleated = False
+        if i == 10:
+            print(f'Assigning of equations is FAILED! Max inetration reached: {i}')
+
         
     @staticmethod
     def express_eq_as_zero(equastions):
@@ -1371,7 +1399,7 @@ class BondGraph():
                 input_variables.append(sp.sympify(element.getinputVariable()))
             if element.getParam() is not None:
                 parameter_variables.append(sp.sympify(element.getParam()))
-        print('capacitor_variables =', capacitor_variables, 'input_variables=', input_variables, 'state_variables=', state_variables, 'parameter_variables=', parameter_variables)
+        if self.debug: print('capacitor_variables =', capacitor_variables, 'input_variables=', input_variables, 'state_variables=', state_variables, 'parameter_variables=', parameter_variables)
         
         self.capacitor_variables = capacitor_variables
         self.input_variables = input_variables
@@ -1647,7 +1675,7 @@ class BondGraph():
             if value.func == sp.core.add.Add:
                 # print('---------------THIS IS ADD, SO LOOK FOR ARGS---------------')
                 for component in value.args:
-                    print(component.args, '--------------')
+                    # print('component:', component, 'args=', component.args, '--------------')
                     #iterates over items in equastion
                     # print("looking for ", component.free_symbols, 'in ', variables_vector)
                     for state_var_id, state_variable in enumerate(variables_vector):
@@ -1670,7 +1698,7 @@ class BondGraph():
                         # print('to be saved in matrix', nobrackets)
                         dummy_matrix[eq_id, state_var_id] = nobrackets
 
-        print(dummy_matrix)
+        # print('dummy_matrix=', dummy_matrix)
         return dummy_matrix
     
     def make_state_statespace(self, cauchy_state_equastions):
@@ -1696,15 +1724,15 @@ class BondGraph():
         # print("x_vect=", x_vect)
         # print("u_vect=", u_vect)
         A = sp.MatrixSymbol('A', m_size, m_size)
-        B = sp.MatrixSymbol('B', n_size, m_size)
+        B = sp.MatrixSymbol('B', m_size, n_size)
         A_matrix = sp.Matrix(A)
         B_matrix = sp.Matrix(B)
         # fill mtrx by 0
         for i in range(m_size):
             for j in range(m_size):
                 A_matrix[i, j] = 0
-        for i in range(n_size):
-            for j in range(m_size):
+        for i in range(m_size):
+            for j in range(n_size):
                 B_matrix[i, j] = 0
         # for state
         A_matrix = self.make_matrix_from_cauchy(A_matrix, cauchy_state_equastions, self.state_variables)
@@ -1724,7 +1752,7 @@ class BondGraph():
         n_size = len(self.input_variables)
 
         C = sp.MatrixSymbol('C', m_size, m_size)
-        D = sp.MatrixSymbol('D', n_size, m_size)
+        D = sp.MatrixSymbol('D', m_size, n_size)
         C_matrix = sp.Matrix(C)
         D_matrix = sp.Matrix(D)
 
@@ -1732,8 +1760,8 @@ class BondGraph():
         for i in range(m_size):
             for j in range(m_size):
                 C_matrix[i, j] = 0
-        for i in range(n_size):
-            for j in range(m_size):
+        for i in range(m_size):
+            for j in range(n_size):
                 D_matrix[i, j] = 0
         # for state
         C_matrix = self.make_matrix_from_cauchy(C_matrix, cauchy_form_output_eq, self.state_variables)
@@ -1808,6 +1836,8 @@ class BondGraph():
         C = np.array(self.__C.subs({parameters_list[i]:parameters_values[i] for i in range(len(parameters_list))})).astype(np.float64)
         D = np.array(self.__D.subs({parameters_list[i]:parameters_values[i] for i in range(len(parameters_list))})).astype(np.float64)
         
+        print(type(A), A.shape, type(B), B.shape)
+
         I = np.identity(A.shape[0]) # this is an identity matrix
         Ad = np.linalg.inv(I - sampling_period * A)
         Bd = Ad.dot(sampling_period * B)
