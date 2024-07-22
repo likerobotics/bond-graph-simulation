@@ -377,12 +377,11 @@ class BondGraph():
         return self.__id
     
     def check(self):
+        print(f'This functionality carrently under development and will be updated soon!')
+        #TODO  Check if any port, or bond or element is not connected
+        # check if there are sympols that is not variables of system
         pass
 
-
-     #TODO  Check if any port, or bond or element is not connected
-     # check if there are sympols that is not variables of system
-    
     def addBond(self, Bond):
         """ add edge(connection between Bonds)"""
         self.__bondsList.append(Bond)
@@ -427,8 +426,7 @@ class BondGraph():
     
     def render(self):
         '''
-        reset positions for all bonds
-        depended on connections
+        reset positions for all bonds depended on connections
         
         RULE
         use adjacency dict to find node with max connections, others are placed around according the adjactecy
@@ -473,25 +471,33 @@ class BondGraph():
             i.setPosition([pos_xy[0], pos_xy[1]])
         
     
-    def connect(self, first_element, second):
+    def connect(self, first_element:BGelement, second_element:BGelement):
         ''''
         Automatically create a bond between input Elements (only 2 elements allowed)
         one = BGelement
         second = BGelement
         '''
+        # is this elements in the list of models elements?
+        if first_element not in self.__elementsList:
+            print(f'New BG element detected with ID={first_element.getId()}, adding to the model.')
+            self.addElement(first_element)
+        if second_element not in self.__elementsList:
+            print(f'New BG element detected with ID={second_element.getId()}, adding to the model.')
+            self.addElement(second_element)
 
-        #TODO ASAP
         # Check is the nodes connected already
-        
+        for bond in self.getBondList():
+            if bond.getFromPort() in first_element.getPorts() and bond.getToPort() in second_element.getPorts():
+                print(f'Already connected... Sorry')
+            if bond.getFromPort() in second_element.getPorts() and bond.getToPort() in first_element.getPorts():
+                print(f'Already connected... Sorry')
+
         # create two ports for each elements
         head = BGport()
         tail = BGport()
 
-        # head.setDirection('Input')
-        # head.setDirection('Output')
-
         first_element.addPort(head)
-        second.addPort(tail)
+        second_element.addPort(tail)
         
         # add new ports to model ports lis
         self.__portsList.append(head)
@@ -723,7 +729,7 @@ class BondGraph():
                         for port2 in element.getPorts():
                             if port2 != port: port2.setDirection('Input')
                 elif port.getCausality() == None:
-                    print('TF has NOne causality')
+                    if self.debug: print('TF has NOne causality')
                     if connected_bonds[0].getToPort() == port:
                         #assing based on other side of bonds port causality
                         if connected_bonds[0].getToPort().getCausality() == 'Causal':
@@ -1105,7 +1111,7 @@ class BondGraph():
                     element.setFlow(cont_eq)
                     if self.debug: print('1-junction assigned(effort, flow)=', element_eq, cont_eq)
                 if element.getType() == '0':
-                    #the equastion will depended on causality
+                    #the equation will depended on causality
                     # find all connected ports
                     connected_ports = []
                     for port in self.getPortsList():
@@ -1676,7 +1682,7 @@ class BondGraph():
                 # print('---------------THIS IS ADD, SO LOOK FOR ARGS---------------')
                 for component in value.args:
                     # print('component:', component, 'args=', component.args, '--------------')
-                    #iterates over items in equastion
+                    #iterates over items in equation
                     # print("looking for ", component.free_symbols, 'in ', variables_vector)
                     for state_var_id, state_variable in enumerate(variables_vector):
                         #itrate over states
