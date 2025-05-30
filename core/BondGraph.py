@@ -173,9 +173,10 @@ class BGelement( object ):
         self.ports.append(port)
         return self.ports
     
-    def delPorts(self, port):
+    def removePort(self, port):
+        # remove one Port from Element
         self.ports.remove(port)
-        return self.__ports
+        return self.ports
     
     def getPorts(self):
         return self.ports
@@ -286,13 +287,13 @@ class BGbond( object ):
     def setFromPort(self, port:BGport):
         self.__fromPort = port
         
-    def getFromPort(self):
+    def getFromPort(self) -> BGport:
         return self.__fromPort
         
     def setToPort(self, port:BGport):
         self.__toPort = port
         
-    def getToPort(self):
+    def getToPort(self) -> BGport:
         return self.__toPort
 
     def getId(self):
@@ -388,7 +389,10 @@ class BondGraph():
         
     def addElement(self, BGelement):
         """actually add the node, not edge"""
-        self.__elementsList.append(BGelement)
+        if BGelement not in self.__elementsList:
+            self.__elementsList.append(BGelement)
+        else:
+            print('already used in the model')
         
     def getBondList(self):
         return self.__bondsList
@@ -399,12 +403,19 @@ class BondGraph():
     def getPortsList(self):
         return self.__portsList
     
+    def deletePort(self, port):
+        # delete one Port item from Model ports list
+
+        self.__portsList.remove(port)
+        return self.__portsList
+    
     def getStateEq(self):
         eq = []
         
         return eq
 
     #useful functions
+    
     def adjacency_dict(self):
         """
         Returns the adjacency list representation of graph
@@ -424,25 +435,52 @@ class BondGraph():
             adj[element_to].append(element_from)
         return adj
     
-    def render(self):
-        '''
-        reset positions for all bonds depended on connections
-        
-        RULE
-        use adjacency dict to find node with max connections, others are placed around according the adjactecy
-        '''
-        
-        #temp solution, could be executed only one time
-        # RULE: find node with max edges
+    def render(self, layout_type=None):
+        """
+        Назначает координаты элементам для визуализации.
+
+        :param layout_type: 
+            None      — использовать старый алгоритм;
+            'spring'  — использовать spring_layout из networkx;
+            'circular'— использовать circular_layout из networkx.
+        """
+        nodes = [element.id for element in self.__elementsList]
+
+        # Если выбран networkx layout
+        if layout_type in ('spring', 'circular'):
+            import networkx as nx
+
+            G = nx.Graph()
+            G.add_nodes_from(nodes)
+            for bond in self.__bondsList:
+                # Связи через id элементов
+                from_node = to_node = None
+                for element in self.__elementsList:
+                    if bond.getFromPort() in element.getPorts():
+                        from_node = element.id
+                    if bond.getToPort() in element.getPorts():
+                        to_node = element.id
+                if from_node is not None and to_node is not None:
+                    G.add_edge(from_node, to_node)
+            # Выбор типа layout
+            if layout_type == 'spring':
+                pos = nx.spring_layout(G, seed=42, k=0.5, iterations=100)
+            elif layout_type == 'circular':
+                pos = nx.circular_layout(G)
+            # Назначаем координаты элементам
+            for element in self.__elementsList:
+                if element.id in pos:
+                    element.setPosition(list(pos[element.id]))
+            return  # Завершаем — координаты проставлены
+
+        # === Старый алгоритм, если layout_type не передан или не распознан ===
         adj = self.adjacency_dict()
-        
-        adj_dic_sorted = sorted(adj, key=lambda k: len(adj[k]), reverse = True)
+        adj_dic_sorted = sorted(adj, key=lambda k: len(adj[k]), reverse=True)
         defined = []
         coords = {}
         pointer_x = 0
         pointer_y = 0
         for key in adj_dic_sorted:
-            # 5
             if key in defined:
                 pointer_x += 1
                 pointer_y = 0
@@ -451,39 +489,36 @@ class BondGraph():
                         coords[item] = [pointer_x, pointer_y]
                         defined.append(item)
                         pointer_y += 1
-                    else:
-                        pass
             else:
                 coords[key] = [pointer_x, pointer_y]
                 defined.append(key)
                 pointer_x += 1
-                # now check the connections
                 for idx, item in enumerate(adj[key]):
-                    if item in defined:
-                        pass
-                    else:
+                    if item not in defined:
                         coords[item] = [pointer_x, pointer_y]
                         defined.append(item)
                         pointer_y += 1
-        
+
         for i in self.__elementsList:
             pos_xy = coords[i.getId()]
             i.setPosition([pos_xy[0], pos_xy[1]])
+
         
     
     def connect(self, first_element:BGelement, second_element:BGelement):
         ''''
         Automatically create a bond between input Elements (only 2 elements allowed)
-        one = BGelement
-        second = BGelement
+
+        the elements order is not important, later it could be automatically reversed.
+
         '''
         # is this elements in the list of models elements?
         if first_element not in self.__elementsList:
             print(f'New BG element detected with ID={first_element.getId()}, adding to the model.')
-            self.addElement(first_element)
+            self.__elementsList.append(first_element)
         if second_element not in self.__elementsList:
             print(f'New BG element detected with ID={second_element.getId()}, adding to the model.')
-            self.addElement(second_element)
+            self.__elementsList.append(second_element)
 
         # Check is the nodes connected already
         for bond in self.getBondList():
@@ -507,9 +542,51 @@ class BondGraph():
         Bond.setToPort(head)
         Bond.setFromPort(tail)
         self.__bondsList.append(Bond)
-        
         return self
     
+    def disconnect(self, target_element:BGelement):
+        '''
+        You can disconnect only leaf elements (with one connection)
+        '''
+
+        if target_element in self.__elementsList:
+            t_ports = target_element.getPorts()
+            if len(t_ports) > 1:
+                print('Not a leaf item...')
+                return False
+            print('printing ports')
+            print('item has pors=', t_ports)
+            for port in t_ports:
+                print('llooking for ', port)
+                for bond in self.__bondsList:
+                    if bond.getFromPort() == port or bond.getToPort() == port:
+                        print('remove port ids ', bond.getFromPort(), bond.getToPort())
+                        self.__portsList.remove(bond.getFromPort())
+                        self.__portsList.remove(bond.getToPort())
+                        print('removing bond id ', bond.getId())
+                        self.__bondsList.remove(bond)
+                        for element in self.__elementsList:
+                            if bond.getFromPort() in element.getPorts():
+                                element.removePort(bond.getFromPort())
+                            
+                            if bond.getToPort() in element.getPorts():
+                                element.removePort(bond.getToPort())                            
+
+            # bonds id to be deleted 4,5,6
+            # for port in t_ports:
+            #     if port in self.__portsList:
+            #         self.__portsList.remove(port)
+            #         print('remove port id ', port)
+            
+            self.__elementsList.remove(target_element)
+            print('Removed element = ', target_element.getId())
+            return True
+        else:
+            print('ERROR 020:requested item is not found in the model')
+            return False
+
+
+
     def draw(self):
         """
         Dirty work, but useful just for visualization
@@ -579,13 +656,39 @@ class BondGraph():
             labels[node.id] = str(node.icon)
         
         #lets draw
-        plt.figure(figsize=(19,8))
-        nx.draw_networkx_nodes(G, pos, nodelist=nodes, node_color="tab:red", node_size = 700)
+        # plt.figure(figsize=(19,8))
+        # nx.draw_networkx_nodes(G, pos, nodelist=nodes, node_color="tab:red", node_size = 700)
+        # nx.draw_networkx_edges(G, pos, edgelist=real_edges, edge_color='b', arrowsize=16, arrows=True, connectionstyle='arc3, rad = 0.2')
+        # nx.draw_networkx_edges(G, pos, edgelist=unreal_edges, edge_color='g', arrows=True, connectionstyle='angle3, angleA=90, angleB=0', arrowstyle=']-, widthA=1.5, lengthA=0.2', min_source_margin=20, min_target_margin=20)
+        # nx.draw_networkx_labels(G, pos, labels, font_size=15, font_color="whitesmoke", font_weight="bold")
+        # nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)        
+        # plt.margins(0.2)
+
+        # --- Визуализация ---
+        plt.figure(figsize=(19, 8))
+        nx.draw_networkx_nodes(G, pos, nodelist=nodes, node_color="tab:red", node_size=1200)
         nx.draw_networkx_edges(G, pos, edgelist=real_edges, edge_color='b', arrowsize=16, arrows=True, connectionstyle='arc3, rad = 0.2')
         nx.draw_networkx_edges(G, pos, edgelist=unreal_edges, edge_color='g', arrows=True, connectionstyle='angle3, angleA=90, angleB=0', arrowstyle=']-, widthA=1.5, lengthA=0.2', min_source_margin=20, min_target_margin=20)
-        nx.draw_networkx_labels(G, pos, labels, font_size=15, font_color="whitesmoke", font_weight="bold")
-        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)        
+        
+        # nx.draw_networkx_labels(G, pos, labels, font_size=15, font_color="whitesmoke", font_weight="bold")
+        
+        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
+        for elem in self.getElementsList():
+            x, y = pos[elem.id]
+            # Тип (сверху)
+            elem_type = elem.getType() if hasattr(elem, "getType") else getattr(elem, "type", "")
+            plt.text(x, y + 0.13, str(elem_type), color='red', fontsize=9, fontweight='normal', ha='center', va='center')
+            # Имя (по центру)
+            elem_name = elem.getName() if hasattr(elem, "getName") else getattr(elem, "name", "")
+            plt.text(x, y, str(elem_name), color='white', fontsize=13, fontweight='bold', ha='center', va='center')
+            # Значение (снизу)
+            elem_value = elem.getValue() if hasattr(elem, "getValue") else getattr(elem, "value", "")
+            if elem_value not in (None, ''):
+                plt.text(x, y - 0.13, str(elem_value), color='green', fontsize=10, fontweight='bold', ha='center', va='center')
+
         plt.margins(0.2)
+        plt.axis('off')
+        plt.show()
         
     def display_PortsStatus(self):
         ListOfPorts = self.getPortsList()
@@ -820,6 +923,7 @@ class BondGraph():
             else:
 #                 print(f'WARNING! UNdefined direction {item_ports}')
                 pass
+
     def update_bondsport_status(self):
         '''
         If one port assigned, the opposite one can be assigned because of common bond
@@ -990,6 +1094,28 @@ class BondGraph():
         self.__elementsList --> model.getElementsList()
         self.__bondsList --> model.getBondList()
         """
+        # Check for isolated items items in the model
+        # If such one found just remove
+        # bond_used_ports = []
+        # for bond in self.__bondsList:
+        #     bond_used_ports.append(bond.getFromPort())
+        #     bond_used_ports.append(bond.getToPort())
+        
+
+
+        
+        # All bonds is not assigned still and it is okay
+        # for bond in self.getBondList():
+        #     if bond.getId() is None or bond.effort == '' or bond.flow == '':
+        #         print('ERROR!!! Bond has no effort-flow or does not exist id=', bond.getId())
+
+        # All elements and its ports must be assigned  
+        for element in self.getElementsList():
+            for port in element.getPorts():
+                if port.getId() is None or port.getDirection() is None or port.getCausality() is None:
+                    print('++ERROR port_id:', port.getId() , '|  arrow: ', port.getDirection(), '|  causality: ', port.getCausality())
+                    print('belongs to Element name: ', element.getName())
+
         for element in self.__elementsList:
             # print(element.getType(), ports)
             if element.getType() == '1':
@@ -1523,11 +1649,17 @@ class BondGraph():
         self.eff_flows_sp - 
         eff_flows_values - 
         '''
+        eq_expression_iter_limit = 500
         defined_variables = []
-        while self.dict_has_None(variables_exp):
+        while self.dict_has_None(variables_exp) and eq_expression_iter_limit > 0:
             defined_variables, variables_exp = self.effort_flow_iteration(self.eff_flows_sp, self.equastions_sp, self.final_variables, variables_exp, defined_variables)
+            eq_expression_iter_limit-=1
             if self.debug: print('iterates------------------------------>')
-        return variables_exp
+        if eq_expression_iter_limit == 0:
+            print("ERROR: REEXPRESSION MAX ITER LIMIT REACHED")
+            return None
+        else:
+            return variables_exp
     
     def non_state_var(self, variables, final_vars):
         '''
@@ -1805,8 +1937,11 @@ class BondGraph():
         eff_flows_values = [None] * len(self.eff_flows_sp)
         variables_exp = dict(zip(self.eff_flows_sp, eff_flows_values))
         variables_exp = self.make_final_eq_expressions(eff_flows_values, variables_exp)
-        cauchy_state_equastions = self.cauchy_form_state_eq(variables_exp)
-        return cauchy_state_equastions, variables_exp #, final_vars, state_variables, self.eff_flows_sp, input_variables
+        if variables_exp is not None:
+            cauchy_state_equastions = self.cauchy_form_state_eq(variables_exp)
+            return cauchy_state_equastions, variables_exp #, final_vars, state_variables, self.eff_flows_sp, input_variables
+        else:
+            return None, None
 
     def simulate(self, initial_state, input_sequence, time_steps, sampling_period, parameters_values):
         '''
