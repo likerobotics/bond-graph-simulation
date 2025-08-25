@@ -2,11 +2,13 @@ import sympy as sp
 import numpy as np
 from scipy.integrate import solve_ivp
 from core.base import BGElement, BGPort, BGBond, ElementType
+from core.BondGraph2 import BondGraphModel
+from equations.statespace import StateSpaceBuilder
 
 import matplotlib.pyplot as plt
 
 class BondGraphSimulator:
-    def __init__(self, model, state_space_builder):
+    def __init__(self, model:BondGraphModel, state_space_builder:StateSpaceBuilder):
         """
         model — объект модели BondGraph
         state_space_builder — объект StateSpaceBuilder, где уже построены A, B, C, D
@@ -44,12 +46,13 @@ class BondGraphSimulator:
         print("=== Required Data for Numerical Simulation ===")
         print("System parameters (provide param_values: dict[str, float]):")
         print("   ", ", ".join(self.param_names))
+        
         print("   Example: param_values = {'R1': 10.0, 'C2': 0.001, 'L3': 0.1}")
         print()
         print("State variables (provide x0: list[float], in the same order):")
         print("   ", ", ".join(str(x) for x in self.ss.x_vars))
         print("   Example: x0 = [0.0, 0.0]   # (e.g., q2=0, p3=0)")
-        print()
+        print(self.ss.x_vars)
         print("Input variables (provide u_func: Callable[[float], list[float]], in the same order):")
         print("   ", ", ".join(str(u) for u in self.ss.u_vars))
         print("   Example: u_func = lambda t: [1.0]   # if a single input, e.g., SE0=1 always")

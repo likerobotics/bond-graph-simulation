@@ -28,11 +28,11 @@ class CauchyFormGenerator:
         self.output_eqs = []
 
         # Set of final variables (states, inputs, parameters)
-        self.final_vars = set()
+        self.final_vars = list()
 
-        self.state_vars = set()
-        self.input_vars = set()
-        self.output_vars = set()
+        self.state_vars = list()
+        self.input_vars = list()
+        self.output_vars = list()
         # 
 
     def add_state_derivative_equations(self, equations):
@@ -78,7 +78,7 @@ class CauchyFormGenerator:
         self.global_equations = eqgen.generate_equations()  # только "сырые" алгебраические уравнения
 
         # 2) Собираем все финальные переменные
-        self.final_vars = set()
+        self.final_vars = list()
         self._collect_final_vars()
 
         # 3) Собираем сырые уравнения Коши для всех q и p
@@ -116,16 +116,16 @@ class CauchyFormGenerator:
         for elem in self.model.elements:
             # состояния (обычно qX, pY)
             if hasattr(elem, "state_variable") and elem.state_variable:
-                self.final_vars.add(sp.Symbol(elem.state_variable))
-                self.state_vars.add(sp.Symbol(elem.state_variable))
+                if sp.Symbol(elem.state_variable) not in self.final_vars: self.final_vars.append(sp.Symbol(elem.state_variable))
+                if sp.Symbol(elem.state_variable) not in self.state_vars: self.state_vars.append(sp.Symbol(elem.state_variable))
             # входы (обычно SE, SF)
             if hasattr(elem, "input_variable") and elem.input_variable:
                 iname = elem.input_variable.lstrip('+')
-                self.final_vars.add(sp.Symbol(iname))
-                self.input_vars.add(sp.Symbol(elem.input_variable))
+                if iname not in self.final_vars: self.final_vars.append(sp.Symbol(iname))
+                if iname not in self.input_vars: self.input_vars.append(sp.Symbol(elem.input_variable))
             # параметры (обычно R, C, I, TF, GY, ...)
             if hasattr(elem, "parameter") and elem.parameter:
-                self.final_vars.add(sp.Symbol(elem.parameter))
+                if iname not in self.final_vars: self.final_vars.append(sp.Symbol(elem.parameter))
     # ----------------------------------------------------------------------
     # ШАГ 3: Формируем сырые уравнения Коши для каждой переменной состояния
     # т.е. только начало уравнений, дальше надо пудет подставлять значения
@@ -450,7 +450,7 @@ class StateSpaceBuilder:
         C_matrix = sp.zeros(m_size, n_state)
         D_matrix = sp.zeros(m_size, n_input)
 
-        print(C_matrix, D_matrix)
+        print('C and D matrix values :: ', C_matrix, D_matrix)
 
         for i, y in enumerate(self.output_vars):
             # Находим уравнение для y
