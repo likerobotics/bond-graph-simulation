@@ -1,27 +1,27 @@
 import sympy as sp
 import numpy as np
 from scipy.integrate import solve_ivp
-from core.base import BGElement, BGPort, BGBond, ElementType
-from core.BondGraph2 import BondGraphModel
-from equations.statespace import StateSpaceBuilder
+from bond_graph_simulation.core.base import BGElement, BGPort, BGBond, ElementType
+from bond_graph_simulation.core.BondGraph2 import BondGraphModel
+from bond_graph_simulation.equations.statespace import StateSpaceBuilder
 
 import matplotlib.pyplot as plt
 
 class BondGraphSimulator:
     def __init__(self, model:BondGraphModel, state_space_builder:StateSpaceBuilder):
         """
-        model — объект модели BondGraph
-        state_space_builder — объект StateSpaceBuilder, где уже построены A, B, C, D
+        model — object of BondGraph
+        state_space_builder — object of StateSpaceBuilder, where A, B, C, D are already built
         """
         self.model = model
         self.ss = state_space_builder
 
-        # Собираем параметры, которые нужны для симуляции
+        # Collect parameters needed for simulation
         self.param_syms = self._collect_parameter_symbols()
         self.param_names = [str(p) for p in self.param_syms]
 
     def _collect_parameter_symbols(self):
-        """Собрать все символы-параметры из модели"""
+        # Collect cymbolic parameters from model
         param_types = {
             ElementType.CAPACITOR, ElementType.INDUCTOR, ElementType.RESISTOR,
             ElementType.SOURCE_EFFORT, ElementType.SOURCE_FLOW,
@@ -34,7 +34,7 @@ class BondGraphSimulator:
         return sorted(list(params), key=lambda s: str(s))
 
     def list_required_parameters(self):
-        """Вернуть список имен всех параметров, которые нужны для симуляции"""
+        # Return list of parameter names needed for simulation
         return self.param_names
     
     def print_simulation_requirements(self):
@@ -70,7 +70,7 @@ class BondGraphSimulator:
         time_steps: list[float],
         sampling_period: float,
         parameter_values: dict[str, float]
-    ):
+    ): 
         """
         initial_state: list[float] — initial values of the states, length = number of states  
         input_sequence: list[list[float]] — list of input vectors for each time step (NxM, where N = steps, M = inputs)  
@@ -124,17 +124,18 @@ class BondGraphSimulator:
         }
 
 
-    def plot_simulation_result(self, result, state_names=None, output_names=None, show_states=True, show_outputs=True):
+    def plot_simulation_result(self, result, state_names=None, input_names=None, output_names=None, show_states=True, show_outputs=True):
         """
-        result: словарь из simulate (t, x, y)
-        state_names: список строк для переменных состояния (если None — индексы)
-        output_names: список строк для выходов (если None — индексы)
+        result: dict from simulate (t, x, u, y)
+        state_names: list of strings for state variables (if None — indices)
+        input_name:  list of strings for input variables (if None — indices)
+        output_names: list of strings for output variables (if None — indices)
         """
         t = result['t']
         fig, ax = plt.subplots(figsize=(12, 5))
         handles = []
 
-        # --- Состояния ---
+        # --- Plot states ---
         if show_states:
             x = result['x']
             n_states = x.shape[1]
@@ -143,12 +144,16 @@ class BondGraphSimulator:
                 line, = ax.plot(t, x[:, i], label=f"State: {state_names[i]}")
                 handles.append(line)
 
-        # --- Выходы ---
+        # --- Plot outputs ---
         if show_outputs and 'y' in result:
             y = result['y']
+            print('y.shape=', y.shape)
+            
             n_outputs = y.shape[1] if len(y.shape) > 1 else 1
             output_names = output_names or [f"y{i+1}" for i in range(n_outputs)]
+            print("output_names=", output_names)
             for i in range(n_outputs):
+
                 line, = ax.plot(t, y[:, i], '--', label=f"Output: {output_names[i]}")
                 handles.append(line)
 
@@ -158,7 +163,7 @@ class BondGraphSimulator:
         leg = ax.legend(loc='best', fancybox=True, shadow=True)
         leg_lines = leg.get_lines()
 
-        # --- Интерактивность: клик по легенде включает/выключает линии ---
+        # --- Interactive mode IS NOT WORKING in some environments ---
         def on_legend_pick(event):
             legline = event.artist
             origline = handles[leg_lines.index(legline)]

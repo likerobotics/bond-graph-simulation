@@ -1,4 +1,6 @@
-# План работы на сентябрь
-1. verifyRules 
+# Project plan
+0.  GUI for beginers in BondGraph
+1.  Add more verification rules in model Checker 
 2.  Algebraic loops processing
-
+3.  Tests for all modules
+4.  Documentation

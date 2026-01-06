@@ -1,9 +1,11 @@
+
+from bond_graph_simulation.core.BondGraph2 import BondGraphModel
+from bond_graph_simulation.core.base import ElementFactory
+
 from enum import Enum
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
 import networkx as nx
-from core.BondGraph2 import BondGraphModel
-from core.base import ElementFactory
 
 from dataclasses import dataclass, astuple, asdict, field
 

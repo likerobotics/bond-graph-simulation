@@ -9,22 +9,22 @@ import matplotlib.pyplot as plt
 import networkx as nx
 
 
-
-
 def find_element_by_port(model, port):
-    """Возвращает BGElement, которому принадлежит данный порт."""
+    """
+    Returns the BGElement that owns the given port.
+    """
     for element in model.elements:
         if port in element.ports:
             return element
     return None
 
-def custom_layered_layout(model, distance=2.0, angle_step=math.pi/10, check_tol=0.15, max_iters=100):
+def custom_layered_layout(model, distance=1.5, angle_step=math.pi/10, check_tol=0.15, max_iters=100):
     """
-    previus vertion @render function
+    in previous version @render function
 
-    Располагает новые узлы на фиксированном расстоянии от связанных,
-    выбирая угол с максимальным расстоянием до других размещённых узлов.
-    После расчёта координаты назначаются в .position всех элементов модели.
+    Places nodes in layers based on their connections
+    choosing angles with maximum distance to other placed nodes.
+    after that assigns positions to model elements.
     """
     adj = model.adjacency_dict()
     coords = {}
@@ -58,7 +58,7 @@ def custom_layered_layout(model, distance=2.0, angle_step=math.pi/10, check_tol=
         angles_full_circle = [2 * math.pi * i / n_angles for i in range(n_angles)]
 
         for nbr in unassigned:
-            # Ищем угол с максимальным расстоянием до всех остальных, кроме node
+            # Looking for angle with maximum distance to all others, except node
             best_angle = None
             best_min_dist = -1
             best_xy = None
@@ -68,21 +68,20 @@ def custom_layered_layout(model, distance=2.0, angle_step=math.pi/10, check_tol=
                 for try_r in [distance, distance * 1.2, distance * 1.4]:
                     x = x0 + try_r * math.cos(angle)
                     y = y0 + try_r * math.sin(angle)
-                    # Считаем расстояния до уже размещённых (кроме node, к которому крепим)
+                    # Calculate minimum distance to already placed nodes
                     min_dist = min(
                         math.hypot(x - xx, y - yy)
                         for eid, (xx, yy) in coords.items() if eid != node
                     ) if len(coords) > 1 else float('inf')
 
-                    # Проверяем, достаточно ли далеко (больше check_tol)
+                    # Check if far enough (more than check_tol)
                     if min_dist > best_min_dist and min_dist > check_tol:
                         best_min_dist = min_dist
                         best_angle = angle
                         best_xy = (x, y)
-                # после первого успешного — не крутим r дальше
-
+                # after first successful try_r - no need to try larger r
             if best_xy is None:
-                # Не нашли удачного угла — увеличиваем радиус, ищем "пустое место"
+                # No suitable angle found - increase radius, search for "free space"
                 angle = angles_full_circle[0]
                 for i in range(1, max_iters):
                     r = distance + i * 0.5
@@ -96,13 +95,13 @@ def custom_layered_layout(model, distance=2.0, angle_step=math.pi/10, check_tol=
                         best_xy = (x, y)
                         break
                 else:
-                    # Если вообще нет места — ставим рядом (но это очень редко!)
+                    # If no space at all - put nearby (rare!)
                     best_xy = (x0 + distance, y0)
             coords[nbr] = best_xy
             assigned.add(nbr)
             queue.append(nbr)
 
-    # === НАЗНАЧАЕМ КООРДИНАТЫ В МОДЕЛЬ ===
+    # Setting positions to elements
     for elem in model.elements:
         pos = coords.get(elem.id, None)
         if pos:
@@ -112,7 +111,7 @@ def custom_layered_layout(model, distance=2.0, angle_step=math.pi/10, check_tol=
 
 def draw_bond_graph(model):
     """
-    Отрисовывает граф с уже заданными позициями.
+    Draws the graph with already assigned positions.
     """
     nodes = [element.id for element in model.elements]
     real_edges = []
@@ -122,7 +121,7 @@ def draw_bond_graph(model):
     for bond in model.bonds:
         port_pairs.append([bond.from_port, bond.to_port])
 
-    # Реальные связи (Power flow)
+    # Real connections (Power flow)
     for port_pair in port_pairs:
         bond_from = bond_to = None
         for element in model.elements:
@@ -150,20 +149,20 @@ def draw_bond_graph(model):
 
     edge_labels = {ed: i for i, ed in enumerate(real_edges)}
 
-    # Координаты — берем из element.position
+    # Coordinates — taken from element.position
     pos = {element.id: tuple(element.position) for element in model.elements}
 
     G = nx.MultiDiGraph()
     G.add_nodes_from(nodes)
     G.add_edges_from(real_edges)
-
-    plt.figure(figsize=(19, 13))
+    print('nodes len= ', len(nodes))
+    plt.figure(figsize=(len(nodes), len(nodes)))
     nx.draw_networkx_nodes(G, pos, nodelist=nodes, node_color="tab:red", node_size=1200)
     nx.draw_networkx_edges(G, pos, edgelist=real_edges, edge_color='b', arrowsize=18, arrows=True, connectionstyle='arc3, rad=0.2', min_source_margin=23, min_target_margin=23)
     nx.draw_networkx_edges(G, pos, edgelist=unreal_edges, edge_color='g', arrows=True, connectionstyle='angle3, angleA=90, angleB=0', arrowstyle=']-', min_source_margin=20, min_target_margin=20)
     nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
 
-    # Кастомные подписи к узлам
+    # Custom labels for nodes
     for elem in model.elements:
         x, y = pos[elem.id]
         plt.text(x - 0.2, y + 0.25, str(elem.icon), color='blue', fontsize=9, fontweight='normal', ha='center', va='center')
