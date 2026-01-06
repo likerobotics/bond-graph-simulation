@@ -2,18 +2,18 @@
 
 This package allows:
 + to create a bond-graph model of robotics and mechatronics systems (Electrical, Mechanical, Thermal domains).
-+ to obtain state-space form of the system with energy variables as a state variables
-+ make a simulation of the system
++ to obtain state-space form of the system with energy variables as a state variables (with access to co-energy bariables)
++ to conduct a numerical simulation of the system
 
 ## Restrictions:
 Curent version does work only with the 1-D systems.
 Examples mostly focuses on Robotics domain.
 
 Directory is organized as folows:
-- run/BondGraph.py - the core of bondgraph models
+- run/BondGraph2.py - the core of bondgraph models
 - run/utils.py - the useful functionality to help with model creation
-- examples/* - contains some scripts with the simple example to help beginers
-- dev/* - contains some scripts under development
+- demo/* - contains some scripts with the simple example to help beginers (moved from examples folder)
+- dev/* - contains some scripts under development (not useful for you)
 
 Model *(BondGraph) architecture:
 - Any Port must belong to some Element (Element has a list of associated ports)
@@ -90,7 +90,7 @@ Model *(BondGraph) architecture:
 
 ### TODO list
 Add example of inverted pendulum on card
-Add GY elements
+Add GY-TF elements (done)
 GUI to draw the bondgraph (without coding)
 API for easy interaction with model
 
@@ -98,8 +98,8 @@ API for easy interaction with model
 #### How to contribute
 If you are interested to become a contributor, please send me an email. 
 
-Useful tools to work with state-space form:
 
+Useful tools to work with state-space form:
 https://github.com/python-control/python-control
 
 https://python-control.readthedocs.io/en/0.9.3.post2/

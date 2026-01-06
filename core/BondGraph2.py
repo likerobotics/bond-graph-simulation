@@ -1,6 +1,8 @@
 # core/graph.py
+import sys
+sys.path.append("../")
 from typing import List
-from core.base import BGElement, BGPort, BGBond, ElementType
+from bond_graph_simulation.core.base import BGElement, BGPort, BGBond, ElementType
 from itertools import count
 from typing import Optional
 from enum import Enum
@@ -40,8 +42,8 @@ class BondGraphModel:
     
     def find_element_by_port_name(self, port_name):
         """
-        Возвращает элемент (BGElement), который содержит порт с заданным именем port_name.
-        Если не найден — возвращает None.
+        Returns the element (BGElement) that contains a port with the given port_name.
+        If not found, returns None.
         """
         for element in self.elements:
             for port in element.ports:
@@ -60,29 +62,30 @@ class BondGraphModel:
         Returns the adjacency list representation of the BondGraphModel.
         Does not care about directions. Used only for drawing/position calculation.
         """
-        # Собираем id всех элементов
-        nodes = [element.id for element in model.elements]
+         
+        nodes = [element.id for element in model.elements]# Id list of all elements
         adj = {node: [] for node in nodes}
 
-        # Для каждого bond ищем, какие элементы соединяются через from_port/to_port
+        #For each bond, find which elements are connected via from_port/to_port
         for bond in model.bonds:
             element_from = None
             element_to = None
-            # Ищем элементы, к которым относятся порты
+            # Find elements to which the ports belong
             for element in model.elements:
                 if bond.from_port in element.ports:
                     element_from = element.id
                 if bond.to_port in element.ports:
                     element_to = element.id
             if element_from is not None and element_to is not None:
-                # Добавляем двустороннюю связь
+                # Add bidirectional connection
                 adj[element_from].append(element_to)
                 adj[element_to].append(element_from)
         return adj
     
     def debug_display_bonds(self):
+        # Display detailed info about bonds and their ports
         for bond in self.bonds:
-            # Найти элементы, связанные с bond.from_port и bond.to_port
+            # Find elements to which the ports belong bond.from_port and bond.to_port
             from_elem = next((e for e in self.elements if bond.from_port in e.ports), None)
             to_elem = next((e for e in self.elements if bond.to_port in e.ports), None)
             print(f"Bond {bond.id}:")
